@@ -1,0 +1,17 @@
+{
+  "name": "kleber-erp",
+  "version": "0.1.0",
+  "description": "ERP modular para gestión de transportes",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r --parallel build",
+    "lint": "pnpm -r --parallel lint",
+    "test": "pnpm -r --parallel test",
+    "format": "pnpm -r --parallel format"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "prettier": "^3.0.0"
+  }
+}

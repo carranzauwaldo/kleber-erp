@@ -1,0 +1,17 @@
+{
+  "name": "@kleber/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "eslint": "^8.45.0"
+  }
+}

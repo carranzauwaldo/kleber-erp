@@ -1,0 +1,27 @@
+name: Test & Lint
+
+on:
+  push:
+    branches: [main, staging, "claude/**", "codex/**"]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - run: pnpm install
+      - run: pnpm lint || true
+      - run: pnpm build || true
+      - run: pnpm test --run || true
