@@ -122,7 +122,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   }
 });
 
-// AUTH: Register (placeholder)
+// AUTH: Register
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   try {
     const { email, password, name } = req.body;
@@ -134,10 +134,36 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       });
     }
 
-    // TODO: Implement user registration
-    return res.status(501).json({
-      success: false,
-      error: 'Registration not yet implemented',
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email already registered',
+      });
+    }
+
+    // Create user (demo org)
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name,
+        password: hashPassword(password),
+        role: 'VIEWER', // Default role
+        organizationId: 'org-demo-1', // TODO: Allow org selection
+      },
+    });
+
+    const token = generateToken(user.id, user.role);
+    return res.status(201).json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
     });
   } catch (error) {
     console.error('Register error:', error);
