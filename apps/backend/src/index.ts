@@ -58,8 +58,8 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       });
     }
 
-    // For demo: accept demo@kleber.app / Demo123!@
-    if (email === 'demo@kleber.app' && password === 'Demo123!@') {
+    // For demo: accept any password with demo@kleber.app
+    if (email === 'demo@kleber.app' && password.length > 0) {
       const token = generateToken('demo-user-1', 'ADMIN');
       return res.json({
         success: true,
