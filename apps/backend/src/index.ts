@@ -36,6 +36,44 @@ function generateToken(userId: string, role: string): string {
   return Buffer.from(JSON.stringify(payload)).toString('base64');
 }
 
+// Middleware: Check JWT token
+function verifyToken(token: string): any {
+  try {
+    const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+    if (decoded.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+// Middleware: Require authentication
+function requireAuth(req: Request, res: Response, next: () => void): any {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'No token provided' });
+  }
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(401).json({ success: false, error: 'Invalid or expired token' });
+  }
+  (req as any).user = decoded;
+  next();
+}
+
+// Middleware: Require specific role
+function requireRole(...roles: string[]) {
+  return (req: Request, res: Response, next: () => void) => {
+    const user = (req as any).user;
+    if (!user || !roles.includes(user.role)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    }
+    next();
+  };
+}
+
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({
@@ -108,7 +146,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 });
 
 // Assets
-app.get('/api/assets', async (req: Request, res: Response) => {
+app.get('/api/assets', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
   try {
     const assets = await prisma.asset.findMany();
     res.json({ success: true, data: assets });
@@ -118,7 +156,7 @@ app.get('/api/assets', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/assets', async (req: Request, res: Response) => {
+app.post('/api/assets', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN', 'MANAGER'), async (req: Request, res: Response) => {
   try {
     const { name, type, licensePlate, organizationId } = req.body;
     if (!name || !type || !organizationId) {
@@ -138,7 +176,7 @@ app.post('/api/assets', async (req: Request, res: Response) => {
 });
 
 // Trips
-app.get('/api/trips', async (req: Request, res: Response) => {
+app.get('/api/trips', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
   try {
     const trips = await prisma.trip.findMany();
     res.json({ success: true, data: trips });
@@ -148,7 +186,7 @@ app.get('/api/trips', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/trips', async (req: Request, res: Response) => {
+app.post('/api/trips', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN', 'MANAGER', 'DRIVER'), async (req: Request, res: Response) => {
   try {
     const { tripNumber, origin, destination, freightValue, organizationId } = req.body;
     if (!tripNumber || !origin || !destination || !organizationId) {
