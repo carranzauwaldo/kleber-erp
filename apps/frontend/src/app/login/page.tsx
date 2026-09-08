@@ -112,8 +112,16 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Signup link */}
+        <p className="text-center text-gray-600 text-sm mt-6">
+          ¿No tienes cuenta?{' '}
+          <Link href="/register" className="text-blue-600 hover:underline font-semibold">
+            Registrarse
+          </Link>
+        </p>
+
         {/* Footer link */}
-        <div className="text-center mt-6">
+        <div className="text-center mt-4">
           <Link href="/" className="text-blue-600 hover:text-blue-700 text-sm">
             ← Volver al inicio
           </Link>
