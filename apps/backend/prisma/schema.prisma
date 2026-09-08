@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Organizaciones/Empresas
+model Organization {
+  id        String   @id @default(uuid())
+  legalName String
+  tradeName String?
+  status    String   @default("active") // active, inactive
+  timezone  String   @default("America/Bogota")
+  
+  // Relaciones
+  users     User[]
+  assets    Asset[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Usuarios
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String
+  password       String? // Will be hashed
+  status         String   @default("active")
+  
+  // Relaciones
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([organizationId])
+}
+
+// Activos (Vehículos, Maquinaria, etc)
+model Asset {
+  id              String   @id @default(uuid())
+  name            String
+  type            String   // tractor, volqueta, bobcat, etc
+  licensePlate    String?  @unique
+  status          String   @default("active")
+  ownershipType   String   @default("full") // full, partial, etc
+  
+  // Relaciones
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([organizationId])
+}
+
+// Viajes (Trips)
+model Trip {
+  id              String   @id @default(uuid())
+  tripNumber      String   @unique
+  status          String   @default("draft") // draft, active, closed
+  
+  // Datos operativos
+  origin          String
+  destination     String
+  material        String?
+  quantity        String?
+  
+  // Datos financieros
+  freightValue    Decimal  @db.Decimal(12, 2)
+  materialValue   Decimal? @db.Decimal(12, 2)
+  
+  // Relaciones
+  organizationId  String
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([organizationId])
+  @@index([status])
+}
+
+// Auditoría: Log de cambios
+model AuditLog {
+  id            String   @id @default(uuid())
+  action        String   // CREATE, UPDATE, DELETE
+  entityType    String   // User, Asset, Trip, etc
+  entityId      String
+  oldValues     Json?
+  newValues     Json?
+  
+  organizationId String
+  
+  createdAt DateTime @default(now())
+  
+  @@index([organizationId])
+  @@index([entityType])
+}
