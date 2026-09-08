@@ -201,6 +201,32 @@ app.post('/api/assets', (req: Request, res: Response, next) => requireAuth(req, 
   }
 });
 
+app.put('/api/assets/:id', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN', 'MANAGER'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, type, licensePlate, status } = req.body;
+    const asset = await prisma.asset.update({
+      where: { id },
+      data: { name, type, licensePlate: licensePlate || null, status },
+    });
+    res.json({ success: true, data: asset });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update asset' });
+  }
+});
+
+app.delete('/api/assets/:id', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.asset.delete({ where: { id } });
+    res.json({ success: true, message: 'Asset deleted' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete asset' });
+  }
+});
+
 // Trips
 app.get('/api/trips', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
   try {
@@ -234,6 +260,32 @@ app.post('/api/trips', (req: Request, res: Response, next) => requireAuth(req, r
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ success: false, error: 'Failed to create trip' });
+  }
+});
+
+app.put('/api/trips/:id', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN', 'MANAGER', 'DRIVER'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { origin, destination, freightValue, status } = req.body;
+    const trip = await prisma.trip.update({
+      where: { id },
+      data: { origin, destination, freightValue, status },
+    });
+    res.json({ success: true, data: trip });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update trip' });
+  }
+});
+
+app.delete('/api/trips/:id', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN', 'MANAGER'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.trip.delete({ where: { id } });
+    res.json({ success: true, message: 'Trip deleted' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete trip' });
   }
 });
 
