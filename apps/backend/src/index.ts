@@ -299,6 +299,26 @@ app.delete('/api/trips/:id', (req: Request, res: Response, next) => requireAuth(
   }
 });
 
+// EXPORT: Assets
+app.get('/api/export/assets', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const assets = await prisma.asset.findMany();
+    res.json({ success: true, data: assets });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Export failed' });
+  }
+});
+
+// EXPORT: Trips
+app.get('/api/export/trips', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const trips = await prisma.trip.findMany();
+    res.json({ success: true, data: trips });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Export failed' });
+  }
+});
+
 // Error handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
