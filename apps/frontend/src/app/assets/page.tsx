@@ -23,7 +23,8 @@ export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', type: 'truck', licensePlate: '' });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({ name: '', type: 'truck', licensePlate: '', status: 'active' });
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -53,16 +54,46 @@ export default function AssetsPage() {
     try {
       const token = (session?.user as any)?.token;
       const organizationId = 'org-demo-1';
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/assets`,
-        { ...formData, organizationId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setFormData({ name: '', type: 'truck', licensePlate: '' });
+
+      if (editingId) {
+        await axios.put(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/assets/${editingId}`,
+          formData,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/assets`,
+          { ...formData, organizationId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+
+      setFormData({ name: '', type: 'truck', licensePlate: '', status: 'active' });
       setShowForm(false);
+      setEditingId(null);
       fetchAssets();
     } catch (error) {
-      console.error('Error creating asset:', error);
+      console.error('Error:', error);
+    }
+  };
+
+  const handleEdit = (asset: Asset) => {
+    setFormData({ name: asset.name, type: asset.type, licensePlate: asset.licensePlate || '', status: asset.status });
+    setEditingId(asset.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Eliminar este activo?')) return;
+    try {
+      const token = (session?.user as any)?.token;
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchAssets();
+    } catch (error) {
+      console.error('Error:', error);
     }
   };
 
@@ -74,7 +105,11 @@ export default function AssetsPage() {
         <h1 className="text-3xl font-bold">Activos</h1>
         <ProtectedByRole roles={['ADMIN', 'MANAGER']}>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              setShowForm(!showForm);
+              if (showForm) setEditingId(null);
+              setFormData({ name: '', type: 'truck', licensePlate: '', status: 'active' });
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold"
           >
             {showForm ? 'Cancelar' : '+ Nuevo Activo'}
@@ -118,11 +153,23 @@ export default function AssetsPage() {
                 placeholder="Ej: ABC-123"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+                <option value="maintenance">Mantenimiento</option>
+              </select>
+            </div>
             <button
               type="submit"
               className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-semibold"
             >
-              Crear Activo
+              {editingId ? 'Actualizar' : 'Crear'} Activo
             </button>
           </div>
         </form>
@@ -136,7 +183,7 @@ export default function AssetsPage() {
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tipo</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Placa</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Fecha</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -157,8 +204,13 @@ export default function AssetsPage() {
                       {asset.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {new Date(asset.createdAt).toLocaleDateString('es-ES')}
+                  <td className="px-6 py-4 text-sm space-x-2">
+                    <ProtectedByRole roles={['ADMIN', 'MANAGER']}>
+                      <button onClick={() => handleEdit(asset)} className="text-blue-600 hover:text-blue-800 font-semibold">Editar</button>
+                    </ProtectedByRole>
+                    <ProtectedByRole roles={['ADMIN']}>
+                      <button onClick={() => handleDelete(asset.id)} className="text-red-600 hover:text-red-800 font-semibold">Eliminar</button>
+                    </ProtectedByRole>
                   </td>
                 </tr>
               ))
