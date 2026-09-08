@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
@@ -18,12 +19,17 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // TODO: Integrar con NextAuth signIn
-      console.log('Login attempt:', { email, password });
-      
-      // Por ahora, simulamos login exitoso
-      setError('Autenticación en desarrollo');
-      
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError(result.error || 'Error al iniciar sesión');
+      } else if (result?.ok) {
+        router.push('/');
+      }
     } catch (err) {
       setError('Error al iniciar sesión');
     } finally {
@@ -95,13 +101,14 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Demo info */}
+        {/* Demo credentials */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-gray-600 mb-2">
-            <span className="font-semibold">Demo:</span> Autenticación en desarrollo
+          <p className="text-sm font-semibold text-gray-700 mb-2">Demo:</p>
+          <p className="text-xs text-gray-600">
+            Email: <span className="font-mono">demo@kleber.app</span>
           </p>
-          <p className="text-xs text-gray-500">
-            NextAuth será configurado en la siguiente iteración
+          <p className="text-xs text-gray-600">
+            Password: <span className="font-mono">Demo123!@</span>
           </p>
         </div>
 

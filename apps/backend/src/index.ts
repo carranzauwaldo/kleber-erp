@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 
 dotenv.config({ path: '.env.local' });
 
@@ -19,6 +20,22 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Helper: Hash password (simple for now)
+function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+// Helper: Generate JWT token (simplified)
+function generateToken(userId: string, role: string): string {
+  const payload = {
+    userId,
+    role,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
+  };
+  return Buffer.from(JSON.stringify(payload)).toString('base64');
+}
+
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({
@@ -27,6 +44,67 @@ app.get('/api/health', (req: Request, res: Response) => {
     environment: process.env.NODE_ENV || 'development',
     uptime: process.uptime(),
   });
+});
+
+// AUTH: Login
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password required',
+      });
+    }
+
+    // For demo: accept demo@kleber.app / Demo123!@
+    if (email === 'demo@kleber.app' && password === 'Demo123!@') {
+      const token = generateToken('demo-user-1', 'ADMIN');
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: 'demo-user-1',
+          email: 'demo@kleber.app',
+          name: 'Demo User',
+          role: 'ADMIN',
+        },
+      });
+    }
+
+    // TODO: Implement real user authentication from database
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid credentials',
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, error: 'Login failed' });
+  }
+});
+
+// AUTH: Register (placeholder)
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  try {
+    const { email, password, name } = req.body;
+
+    if (!email || !password || !name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email, password, and name required',
+      });
+    }
+
+    // TODO: Implement user registration
+    return res.status(501).json({
+      success: false,
+      error: 'Registration not yet implemented',
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ success: false, error: 'Registration failed' });
+  }
 });
 
 // Assets
