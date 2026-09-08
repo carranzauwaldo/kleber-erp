@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id            String   @id @default(cuid())
+  legalName     String   @unique
+  tradeName     String?
+  status        String   @default("active")
+  timezone      String   @default("America/Caracas")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users         User[]
+  assets        Asset[]
+  trips         Trip[]
+  auditLogs     AuditLog[]
+
+  @@map("organizations")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  password        String
+  status          String   @default("active")
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Asset {
+  id              String   @id @default(cuid())
+  name            String
+  type            String   // e.g., "truck", "van", "car"
+  licensePlate    String   @unique
+  status          String   @default("active")
+  ownershipType   String   @default("owned") // owned, leased, rented
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("assets")
+}
+
+model Trip {
+  id              String   @id @default(cuid())
+  tripNumber      String   @unique
+  status          String   @default("draft") // draft, active, completed, cancelled
+  origin          String
+  destination     String
+  material        String?
+  quantity        Float?
+  freightValue    Float   @default(0)
+  materialValue   Float   @default(0)
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("trips")
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  action          String   // create, update, delete, etc.
+  entityType      String   // User, Asset, Trip, etc.
+  entityId        String
+  oldValues       String?  // JSON string
+  newValues       String?  // JSON string
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
