@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
+import { z } from 'zod';
 
 dotenv.config({ path: '.env.local' });
 
@@ -74,6 +75,35 @@ function requireRole(...roles: string[]) {
   };
 }
 
+// Validation schemas
+const loginSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'Contraseña requerida'),
+});
+
+const registerSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(6, 'Contraseña debe tener al menos 6 caracteres'),
+  name: z.string().min(2, 'Nombre debe tener al menos 2 caracteres'),
+});
+
+const assetSchema = z.object({
+  name: z.string().min(1, 'Nombre requerido'),
+  type: z.enum(['truck', 'van', 'car']),
+  licensePlate: z.string().optional(),
+  organizationId: z.string().min(1, 'Organization requerida'),
+  status: z.enum(['active', 'inactive', 'maintenance']).optional(),
+});
+
+const tripSchema = z.object({
+  tripNumber: z.string().min(1, 'Número de viaje requerido'),
+  origin: z.string().min(1, 'Origen requerido'),
+  destination: z.string().min(1, 'Destino requerido'),
+  freightValue: z.number().min(0, 'Valor de flete debe ser positivo').optional(),
+  organizationId: z.string().min(1, 'Organization requerida'),
+  status: z.enum(['draft', 'active', 'completed']).optional(),
+});
+
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({
@@ -87,14 +117,12 @@ app.get('/api/health', (req: Request, res: Response) => {
 // AUTH: Login
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email and password required',
-      });
+    const validation = loginSchema.safeParse(req.body);
+    if (!validation.success) {
+      const error = validation.error.errors[0]?.message || 'Validación fallida';
+      return res.status(400).json({ success: false, error });
     }
+    const { email, password } = validation.data;
 
     // Try to find user in database
     const user = await prisma.user.findUnique({ where: { email } });
@@ -135,14 +163,12 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 // AUTH: Register
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   try {
-    const { email, password, name } = req.body;
-
-    if (!email || !password || !name) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email, password, and name required',
-      });
+    const validation = registerSchema.safeParse(req.body);
+    if (!validation.success) {
+      const error = validation.error.errors[0]?.message || 'Validación fallida';
+      return res.status(400).json({ success: false, error });
     }
+    const { email, password, name } = validation.data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -194,13 +220,12 @@ app.get('/api/assets', (req: Request, res: Response, next) => requireAuth(req, r
 
 app.post('/api/assets', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN', 'MANAGER'), async (req: Request, res: Response) => {
   try {
-    const { name, type, licensePlate, organizationId } = req.body;
-    if (!name || !type || !organizationId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields',
-      });
+    const validation = assetSchema.safeParse(req.body);
+    if (!validation.success) {
+      const error = validation.error.errors[0]?.message || 'Validación fallida';
+      return res.status(400).json({ success: false, error });
     }
+    const { name, type, licensePlate, organizationId, status } = validation.data;
     const asset = await prisma.asset.create({
       data: { name, type, licensePlate: licensePlate || null, organizationId },
     });
@@ -250,13 +275,12 @@ app.get('/api/trips', (req: Request, res: Response, next) => requireAuth(req, re
 
 app.post('/api/trips', (req: Request, res: Response, next) => requireAuth(req, res, next), requireRole('ADMIN', 'MANAGER', 'DRIVER'), async (req: Request, res: Response) => {
   try {
-    const { tripNumber, origin, destination, freightValue, organizationId } = req.body;
-    if (!tripNumber || !origin || !destination || !organizationId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields',
-      });
+    const validation = tripSchema.safeParse(req.body);
+    if (!validation.success) {
+      const error = validation.error.errors[0]?.message || 'Validación fallida';
+      return res.status(400).json({ success: false, error });
     }
+    const { tripNumber, origin, destination, freightValue, organizationId, status } = validation.data;
     const trip = await prisma.trip.create({
       data: {
         tripNumber,
