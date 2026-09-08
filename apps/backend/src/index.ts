@@ -96,25 +96,35 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       });
     }
 
-    // For demo: accept any password with demo@kleber.app
-    if (email === 'demo@kleber.app' && password.length > 0) {
-      const token = generateToken('demo-user-1', 'ADMIN');
-      return res.json({
-        success: true,
-        token,
-        user: {
-          id: 'demo-user-1',
-          email: 'demo@kleber.app',
-          name: 'Demo User',
-          role: 'ADMIN',
-        },
+    // Try to find user in database
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
       });
     }
 
-    // TODO: Implement real user authentication from database
-    return res.status(401).json({
-      success: false,
-      error: 'Invalid credentials',
+    // Validate password
+    const hashedPassword = hashPassword(password);
+    if (hashedPassword !== user.password) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
+      });
+    }
+
+    // Generate token
+    const token = generateToken(user.id, user.role);
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
     });
   } catch (error) {
     console.error('Login error:', error);
