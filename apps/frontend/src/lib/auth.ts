@@ -27,11 +27,13 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!response.ok) {
-            throw new Error('Invalid credentials');
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Auth error:', response.status, errorData);
+            throw new Error(errorData.error || 'Invalid credentials');
           }
 
           const data = await response.json();
-          
+
           return {
             id: data.user.id,
             email: data.user.email,
@@ -40,6 +42,7 @@ export const authOptions: NextAuthOptions = {
             token: data.token,
           };
         } catch (error) {
+          console.error('Login error:', error);
           throw new Error('Authentication failed');
         }
       },
