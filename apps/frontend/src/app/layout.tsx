@@ -1,25 +1,25 @@
-import type { Metadata } from 'next'
-import Header from '@/components/Header'
-import './globals.css'
+import type { Metadata } from 'next';
+import './globals.css';
+import Header from '@/components/Header';
 
 export const metadata: Metadata = {
   title: 'KLEBER ERP',
-  description: 'ERP modular para gestión de transportes',
-}
+  description: 'Plataforma de gestión de transportes',
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="es">
-      <body className="min-h-screen bg-gray-50">
+      <body>
         <Header />
-        <main className="max-w-7xl mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8">
           {children}
         </main>
       </body>
     </html>
-  )
+  );
 }
