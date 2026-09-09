@@ -75,6 +75,24 @@ function requireRole(...roles: string[]) {
   };
 }
 
+// Helper: Log audit event
+async function auditLog(action: string, entityType: string, entityId: string, oldValues?: any, newValues?: any, organizationId: string = 'org-demo-1') {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        action,
+        entityType,
+        entityId,
+        oldValues: oldValues ? JSON.stringify(oldValues) : null,
+        newValues: newValues ? JSON.stringify(newValues) : null,
+        organizationId,
+      },
+    });
+  } catch (error) {
+    console.error('Audit log failed:', error);
+  }
+}
+
 // Validation schemas
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -229,6 +247,7 @@ app.post('/api/assets', (req: Request, res: Response, next) => requireAuth(req, 
     const asset = await prisma.asset.create({
       data: { name, type, licensePlate: licensePlate || null, organizationId },
     });
+    await auditLog('create', 'Asset', asset.id, null, asset, organizationId);
     res.status(201).json({ success: true, data: asset });
   } catch (error) {
     console.error('Error:', error);
