@@ -342,6 +342,19 @@ app.delete('/api/trips/:id', (req: Request, res: Response, next) => requireAuth(
   }
 });
 
+// AUDIT: Get audit logs
+app.get('/api/audit/logs', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const logs = await prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    res.json({ success: true, data: logs });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch audit logs' });
+  }
+});
+
 // EXPORT: Assets
 app.get('/api/export/assets', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
   try {
