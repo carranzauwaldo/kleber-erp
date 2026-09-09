@@ -3,6 +3,11 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Note: Para OAuth, necesitas configurar variables de entorno:
+// GOOGLE_ID y GOOGLE_SECRET para Google OAuth
+// GITHUB_ID y GITHUB_SECRET para GitHub OAuth
+// En producción, agregalos a Vercel environment variables
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
