@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 import { z } from 'zod';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
 
 dotenv.config({ path: '.env.local' });
 
@@ -157,6 +159,16 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(401).json({
         success: false,
         error: 'Invalid credentials',
+      });
+    }
+
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      return res.json({
+        success: true,
+        requiresTwoFactor: true,
+        userId: user.id,
+        message: 'Please enter your 2FA code',
       });
     }
 
@@ -339,6 +351,156 @@ app.delete('/api/trips/:id', (req: Request, res: Response, next) => requireAuth(
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete trip' });
+  }
+});
+
+// 2FA: Setup (Generate Secret)
+app.post('/api/2fa/setup', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const dbUser = await prisma.user.findUnique({ where: { id: user.userId } });
+
+    if (!dbUser) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const secret = speakeasy.generateSecret({
+      name: `KLEBER ERP (${dbUser.email})`,
+      issuer: 'KLEBER ERP',
+      length: 32,
+    });
+
+    const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
+
+    // Generate 10 backup codes
+    const backupCodes = Array.from({ length: 10 }, () =>
+      Math.random().toString(36).substring(2, 10).toUpperCase()
+    );
+
+    res.json({
+      success: true,
+      data: {
+        secret: secret.base32,
+        qrCode,
+        backupCodes,
+      },
+    });
+  } catch (error) {
+    console.error('2FA setup error:', error);
+    res.status(500).json({ success: false, error: '2FA setup failed' });
+  }
+});
+
+// 2FA: Verify & Enable
+app.post('/api/2fa/enable', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const { secret, token, backupCodes } = req.body;
+    const user = (req as any).user;
+
+    if (!secret || !token) {
+      return res.status(400).json({ success: false, error: 'Secret and token required' });
+    }
+
+    // Verify token
+    const valid = speakeasy.totp.verify({
+      secret,
+      encoding: 'base32',
+      token,
+      window: 2,
+    });
+
+    if (!valid) {
+      return res.status(400).json({ success: false, error: 'Invalid token' });
+    }
+
+    // Save to database
+    await prisma.user.update({
+      where: { id: user.userId },
+      data: {
+        twoFactorEnabled: true,
+        twoFactorSecret: secret,
+        backupCodes: JSON.stringify(backupCodes),
+      },
+    });
+
+    await auditLog('enable_2fa', 'User', user.userId, null, { twoFactorEnabled: true });
+
+    res.json({ success: true, message: '2FA enabled successfully' });
+  } catch (error) {
+    console.error('2FA enable error:', error);
+    res.status(500).json({ success: false, error: '2FA enable failed' });
+  }
+});
+
+// 2FA: Verify Token (During Login)
+app.post('/api/2fa/verify', async (req: Request, res: Response) => {
+  try {
+    const { userId, token } = req.body;
+
+    if (!userId || !token) {
+      return res.status(400).json({ success: false, error: 'User ID and token required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.twoFactorSecret) {
+      return res.status(404).json({ success: false, error: 'User or 2FA not found' });
+    }
+
+    const valid = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: 'base32',
+      token,
+      window: 2,
+    });
+
+    if (!valid) {
+      return res.status(401).json({ success: false, error: 'Invalid 2FA token' });
+    }
+
+    const jwtToken = generateToken(user.id, user.role);
+    res.json({
+      success: true,
+      token: jwtToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('2FA verify error:', error);
+    res.status(500).json({ success: false, error: '2FA verification failed' });
+  }
+});
+
+// 2FA: Disable
+app.post('/api/2fa/disable', (req: Request, res: Response, next) => requireAuth(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const { password } = req.body;
+    const user = (req as any).user;
+
+    if (!password) {
+      return res.status(400).json({ success: false, error: 'Password required' });
+    }
+
+    const dbUser = await prisma.user.findUnique({ where: { id: user.userId } });
+    if (!dbUser || hashPassword(password) !== dbUser.password) {
+      return res.status(401).json({ success: false, error: 'Invalid password' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        backupCodes: null,
+      },
+    });
+
+    await auditLog('disable_2fa', 'User', user.userId);
+
+    res.json({ success: true, message: '2FA disabled' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: '2FA disable failed' });
   }
 });
 

@@ -5,13 +5,17 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import axios from 'axios';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [twoFACode, setTwoFACode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needs2FA, setNeeds2FA] = useState(false);
+  const [userId, setUserId] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,19 +23,56 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      });
+      // Try direct API call first to check for 2FA
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`,
+        { email, password }
+      );
 
-      if (result?.error) {
-        setError(result.error || 'Error al iniciar sesión');
-      } else if (result?.ok) {
+      if (res.data.requiresTwoFactor) {
+        setNeeds2FA(true);
+        setUserId(res.data.userId);
+      } else {
+        // Direct login worked (no 2FA)
+        const result = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        });
+
+        if (result?.ok) {
+          router.push('/');
+        }
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/2fa/verify`,
+        { userId, token: twoFACode }
+      );
+
+      if (res.data.success) {
+        // Manually set auth with received token
+        await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        });
         router.push('/');
       }
-    } catch (err) {
-      setError('Error al iniciar sesión');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Código 2FA inválido');
     } finally {
       setLoading(false);
     }
@@ -56,8 +97,51 @@ export default function LoginPage() {
           Plataforma de gestión de transportes
         </p>
 
+        {/* 2FA Form */}
+        {needs2FA && (
+          <form onSubmit={handle2FASubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Código de Autenticación
+              </label>
+              <input
+                type="text"
+                value={twoFACode}
+                onChange={(e) => setTwoFACode(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                placeholder="000000"
+                maxLength={6}
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg transition"
+            >
+              {loading ? 'Verificando...' : 'Verificar'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setNeeds2FA(false)}
+              className="w-full text-blue-600 hover:text-blue-700 text-sm"
+            >
+              Volver
+            </button>
+          </form>
+        )}
+
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {!needs2FA && (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email
@@ -100,6 +184,7 @@ export default function LoginPage() {
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
+        )}
 
         {/* Demo credentials */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
